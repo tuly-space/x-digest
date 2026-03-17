@@ -22,7 +22,45 @@ SPAM_PATTERNS = [
     r'(?i)limited time offer|act now|don\'t miss',
 ]
 
+# Relevance filter: tweet must match at least one of these to be kept
+AI_RELEVANCE_PATTERNS = [
+    r'(?i)\bAI\b', r'(?i)\bartificial intelligence\b',
+    r'(?i)\bLLM\b', r'(?i)\blarge language model\b',
+    r'(?i)\bGPT[-\s]?\d', r'(?i)\bclaude\b', r'(?i)\bgemini\b',
+    r'(?i)\bagent[s]?\b', r'(?i)\bagentic\b',
+    r'(?i)\bmachine learning\b', r'(?i)\bdeep learning\b',
+    r'(?i)\bneural\b', r'(?i)\btransformer\b',
+    r'(?i)\bfine.?tun', r'(?i)\bprompt\b',
+    r'(?i)\bRAG\b', r'(?i)\bembedding\b',
+    r'(?i)\btoken[s]?\b', r'(?i)\binference\b',
+    r'(?i)\bfoundation model\b', r'(?i)\bopen.?source\b',
+    r'(?i)\bmodel[s]?\b',
+    r'(?i)\bSaaS\b', r'(?i)\bstartup\b', r'(?i)\bYC\b',
+    r'(?i)\bfunding\b', r'(?i)\bseries [A-D]\b',
+    r'(?i)\bcoding\b', r'(?i)\bdev tool', r'(?i)\bdeveloper\b',
+    r'(?i)\bautomation\b', r'(?i)\bworkflow\b',
+    r'(?i)\bcompute\b', r'(?i)\bGPU\b', r'(?i)\bTPU\b',
+    r'(?i)\bchip\b', r'(?i)\brobot', r'(?i)\bhardware\b',
+    r'(?i)\bOpenAI\b', r'(?i)\bAnthropic\b',
+    r'(?i)\bcodex\b', r'(?i)\bcopilot\b', r'(?i)\bcursor\b',
+    r'(?i)\bAPI\b', r'(?i)\bsdk\b',
+    r'(?i)\bvector\b', r'(?i)\bdiffusion\b',
+    r'(?i)\bscale\b.*\b(AI|model|infra)',
+    r'(?i)\bARC[-\s]?AGI', r'(?i)\bbenchmark\b',
+    r'(?i)\breinforcement learning\b', r'(?i)\bRLHF\b',
+    r'(?i)\bmultimodal\b', r'(?i)\bvision model\b',
+    r'(?i)\bcontext window\b', r'(?i)\breasoning\b',
+]
+
 MIN_TEXT_LEN = 30
+
+
+def is_ai_relevant(text: str) -> bool:
+    """Check if tweet is related to AI/LLM/tech topics."""
+    for pattern in AI_RELEVANCE_PATTERNS:
+        if re.search(pattern, text):
+            return True
+    return False
 
 
 def parse_engagement(val: str) -> int:
@@ -91,11 +129,15 @@ def main():
     
     # Filter
     filtered = []
+    dropped_irrelevant = 0
     for t in tweets:
         text = t.get('text', '')
         if len(text) < MIN_TEXT_LEN:
             continue
         if is_spam(text):
+            continue
+        if not is_ai_relevant(text):
+            dropped_irrelevant += 1
             continue
         filtered.append(t)
     
@@ -113,7 +155,7 @@ def main():
     print(digest)
     
     # Also output stats to stderr
-    print(f"\n---\nTotal scraped: {len(tweets)} | After filter: {len(filtered)} | Showing top: {len(top)}", file=sys.stderr)
+    print(f"\n---\nTotal scraped: {len(tweets)} | Dropped irrelevant: {dropped_irrelevant} | After filter: {len(filtered)} | Showing top: {len(top)}", file=sys.stderr)
 
 
 if __name__ == '__main__':

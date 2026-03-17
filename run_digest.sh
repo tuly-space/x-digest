@@ -18,10 +18,10 @@ if [ -z "$RAW" ] || [ "$RAW" = "[]" ]; then
 fi
 
 # Step 2: Mark off-topic tweets as "Not interested" (max 3, with delays)
-echo "$RAW" | cd "$DIR" && uv run --with playwright python mark_not_interested.py 2>&1 || true
+echo "$RAW" | (cd "$DIR" && uv run --with playwright python mark_not_interested.py) 2>&1 || true
 
 # Step 3: Filter and format digest
-DIGEST=$(echo "$RAW" | cd "$DIR" && uv run python filter_digest.py 2>/dev/null)
+DIGEST=$(echo "$RAW" | (cd "$DIR" && uv run python filter_digest.py) 2>/dev/null)
 
 if [ -z "$DIGEST" ]; then
     echo "Empty digest after filtering at $TIMESTAMP" >&2
