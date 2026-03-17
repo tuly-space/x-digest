@@ -8,7 +8,7 @@ import json
 import sys
 from playwright.async_api import async_playwright
 
-SCROLL_ROUNDS = 8  # ~40-60 tweets
+SCROLL_ROUNDS = 15  # ~80-120 tweets
 SCROLL_PX = 1000
 SCROLL_WAIT_MS = 2000
 

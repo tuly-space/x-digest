@@ -147,8 +147,8 @@ def main():
     
     filtered.sort(key=lambda x: x['_score'], reverse=True)
     
-    # Take top 15
-    top = filtered[:15]
+    # Take top 30
+    top = filtered[:30]
     
     # Output
     digest = format_digest(top)
