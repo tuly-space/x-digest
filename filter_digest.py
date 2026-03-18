@@ -127,7 +127,7 @@ def format_digest(tweets: list) -> str:
         lines.append(f"**{i}. @{handle}** — ❤️{likes} 🔁{retweets}")
         lines.append(f"> {text}")
         if link:
-            lines.append(f"> {link}")
+            lines.append(link)
         lines.append("")
     
     return "\n".join(lines)
