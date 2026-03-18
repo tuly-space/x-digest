@@ -154,6 +154,7 @@ def save_seen_links(path: str, links: list):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--seen-file', default='', help='Path to file tracking seen tweet links (for deduplication)')
+    parser.add_argument('--output', choices=['markdown', 'json'], default='markdown', help='Output format')
     args = parser.parse_args()
 
     raw = sys.stdin.read()
@@ -198,8 +199,11 @@ def main():
     save_seen_links(args.seen_file, new_links)
 
     # Output
-    digest = format_digest(top)
-    print(digest)
+    if args.output == 'json':
+        print(json.dumps(top, ensure_ascii=False))
+    else:
+        digest = format_digest(top)
+        print(digest)
 
     # Also output stats to stderr
     print(
