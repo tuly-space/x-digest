@@ -1,25 +1,54 @@
 # X Digest
 
-Automated hourly digest of AI/LLM-related content from Twitter/X "For You" timeline.
+Automated hourly digest from Twitter/X "For You" timeline — scrape, LLM-classify, deduplicate, deliver to Discord.
 
 ## How it works
 
-1. **Scrape** — Playwright connects to a logged-in Chrome session, scrolls the For You timeline
-2. **Filter** — Drops spam, promo, low-effort, and off-topic (non-AI/LLM) tweets
-3. **Rank** — Scores by engagement × content depth
-4. **Deliver** — Top posts sent to Discord, archived as markdown in `digests/`
-5. **Train** — Off-topic tweets get "Not interested" feedback on X to improve the algorithm
+Each hourly run opens a single Playwright session and does three things **in one pass**:
+
+1. **Scrape** — scroll the For You timeline screen by screen
+2. **Classify** — batch LLM-classify each screen's tweets (`codex exec gpt-5.4-mini`)
+3. **Mark** — immediately flag spam tweets as "Not interested" while still in DOM
+
+Then:
+
+4. **Follow** — auto-follow quality tweet authors not yet followed (max 5/run)
+5. **Filter + deduplicate** — keep only `verdict=quality`, skip already-seen links
+6. **Archive** — save digest to `digests/YYYY-MM-DD_HH.md`, push to git
+7. **Deliver** — post as a new thread in Discord forum `#tweets`
+
+The scrape→classify→mark interleaving is intentional: X removes off-screen DOM nodes on scroll, so you can't scrape everything first and mark later.
 
 ## Structure
 
 ```
-digests/
-  YYYY-MM-DD_HH.md    # Hourly digest archive
-scrape_timeline.py     # Timeline scraper
-filter_digest.py       # Quality filter + ranker
-mark_not_interested.py # Auto-mark off-topic tweets
-run_digest.sh          # Orchestrator
+scrape_and_process.py    # Core: scrape + classify + mark (interleaved)
+auto_follow.py           # Auto-follow quality authors
+filter_digest.py         # Keep quality tweets, dedup, rank, format
+run_digest.sh            # Orchestrator (cron entry point)
+seen_links.txt           # Cross-run dedup state (local, not in git)
+digests/                 # Hourly digest archive (git tracked)
 ```
+
+## Running manually
+
+```bash
+cd projects/x-digest
+bash run_digest.sh
+```
+
+Requires: Chrome running at `localhost:18800` with X logged in (`~/chrome-profile`), and `codex` CLI available.
+
+## Quality criteria (LLM judge)
+
+**Keep (quality):**
+- Product thinking, design decisions, user insights
+- Engineering practices, lessons learned
+- Business analysis, market observations, startup strategy
+- Thoughtful takes on AI agents / LLMs
+- Founder stories with real substance
+
+**Discard (spam):** Marketing, emotional venting, hype with no content, giveaways, filler.
 
 ## License
 
