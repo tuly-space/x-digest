@@ -25,6 +25,7 @@ SCROLL_ROUNDS = 15
 SCROLL_PX = 900
 SCROLL_WAIT_MS = 1800
 MAX_MARKS_PER_RUN = 5
+MAX_LIKES_PER_RUN = 10
 LLM_MODEL = "gpt-5.4-mini"
 MIN_TEXT_LEN = 30
 
@@ -152,6 +153,7 @@ async def main():
     all_tweets = []          # final classified output
     seen_links = set()       # track extracted links across rounds
     total_marked = 0         # "not interested" count this run
+    total_liked = 0          # liked count this run
     counts = {"quality": 0, "spam": 0, "skip": 0}
 
     async with async_playwright() as p:
@@ -247,6 +249,49 @@ async def main():
                         except Exception:
                             pass
 
+                # ── 3b. Like quality tweets still in DOM ──
+                quality_batch = [t for t in classified if t.get("verdict") == "quality"]
+                for tweet in quality_batch:
+                    if total_liked >= MAX_LIKES_PER_RUN:
+                        break
+                    link_path = tweet["link"].replace("https://x.com", "")
+
+                    try:
+                        articles = await page.locator('article[data-testid="tweet"]').all()
+                        target = None
+                        for art in articles:
+                            lel = art.locator(f'a[href="{link_path}"]').first
+                            if await lel.count() > 0:
+                                target = art
+                                break
+
+                        if target is None:
+                            print(f"  [like] article gone for @{tweet['handle']}", file=sys.stderr)
+                            continue
+
+                        # Check if already liked (aria-label contains "Liked")
+                        like_btn = target.locator('[data-testid="like"]').first
+                        if await like_btn.count() == 0:
+                            # Already liked — button becomes "unlike"
+                            print(f"  [like] already liked @{tweet['handle']}", file=sys.stderr)
+                            continue
+
+                        aria = await like_btn.get_attribute("aria-label") or ""
+                        if "liked" in aria.lower():
+                            print(f"  [like] already liked @{tweet['handle']}", file=sys.stderr)
+                            continue
+
+                        await target.scroll_into_view_if_needed()
+                        await page.wait_for_timeout(300)
+                        await like_btn.click()
+                        total_liked += 1
+                        print(f"  [like] ❤️  @{tweet['handle']} ({total_liked}/{MAX_LIKES_PER_RUN})", file=sys.stderr)
+                        # Rate limit: 3-7s between likes
+                        await page.wait_for_timeout(random.randint(3000, 7000))
+
+                    except Exception as e:
+                        print(f"  [like] error @{tweet['handle']}: {e}", file=sys.stderr)
+
                 # ── 4. Scroll to next screen ──
                 await page.evaluate(f"window.scrollBy(0, {SCROLL_PX})")
                 await page.wait_for_timeout(SCROLL_WAIT_MS)
@@ -254,7 +299,7 @@ async def main():
         finally:
             await page.close()
 
-    print(f"\nDone — total {len(all_tweets)} tweets | quality={counts['quality']} spam={counts['spam']} skip={counts['skip']} | marked={total_marked}", file=sys.stderr)
+    print(f"\nDone — total {len(all_tweets)} tweets | quality={counts['quality']} spam={counts['spam']} skip={counts['skip']} | marked={total_marked} | liked={total_liked}", file=sys.stderr)
     print(json.dumps(all_tweets, ensure_ascii=False))
 
 
