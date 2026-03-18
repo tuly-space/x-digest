@@ -1,5 +1,5 @@
 #!/bin/bash
-# X/Twitter Hourly Digest — scrape → LLM classify → filter → follow → mark spam → archive → push
+# X/Twitter Hourly Digest — scrape+classify+mark (interleaved) → follow → filter → archive → push
 set -euo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
 DIGEST_DIR="$DIR/digests"
@@ -9,27 +9,18 @@ TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 DATE=$(date -u +"%Y-%m-%d")
 HOUR=$(date -u +"%H")
 
-# Step 1: Scrape timeline
-RAW=$(cd "$DIR" && uv run --with playwright python scrape_timeline.py 2>/dev/null)
+# Step 1-2-4 (interleaved): Scrape + LLM classify + mark "Not interested" in one pass
+# Each screen is classified and spam-marked before scrolling away.
+# scrape_and_process.py: JSON on stdout, progress on stderr.
+CLASSIFIED=$(cd "$DIR" && uv run --with playwright python scrape_and_process.py 2>/dev/null)
 
-if [ -z "$RAW" ] || [ "$RAW" = "[]" ]; then
-    echo "No tweets scraped at $TIMESTAMP" >&2
+if [ -z "$CLASSIFIED" ] || [ "$CLASSIFIED" = "[]" ]; then
+    echo "No tweets from scrape_and_process at $TIMESTAMP" >&2
     exit 1
-fi
-
-# Step 2: LLM classify (haiku via OpenRouter)
-CLASSIFIED=$(echo "$RAW" | (cd "$DIR" && uv run python llm_classify.py) 2>/dev/null)
-
-if [ -z "$CLASSIFIED" ]; then
-    echo "LLM classification failed, falling back to raw" >&2
-    CLASSIFIED="$RAW"
 fi
 
 # Step 3: Auto-follow quality tweet authors
 echo "$CLASSIFIED" | (cd "$DIR" && uv run --with playwright python auto_follow.py) 2>&1 || true
-
-# Step 4: Mark spam tweets as "Not interested"
-echo "$CLASSIFIED" | (cd "$DIR" && uv run --with playwright python mark_not_interested.py) 2>&1 || true
 
 # Step 5: Filter and format digest (only quality tweets, dedup across runs)
 SEEN_FILE="$DIR/seen_links.txt"
