@@ -7,8 +7,14 @@ Filtering rules:
 - Drop obvious promo/spam patterns
 - Drop low-engagement tweets (configurable threshold)
 - Rank by a combination of recency and engagement
+- Deduplicate: skip tweets already seen in previous runs (tracked via --seen-file)
+
+Usage:
+    python scrape_timeline.py | python filter_digest.py [--seen-file path/to/seen_links.txt]
 """
+import argparse
 import json
+import os
 import re
 import sys
 from datetime import datetime, timezone
@@ -123,39 +129,80 @@ def format_digest(tweets: list) -> str:
     return "\n".join(lines)
 
 
+def load_seen_links(path: str) -> set:
+    """Load previously seen tweet links from file."""
+    if not path or not os.path.exists(path):
+        return set()
+    with open(path, 'r') as f:
+        return {line.strip() for line in f if line.strip()}
+
+
+def save_seen_links(path: str, links: list):
+    """Append new links to the seen file."""
+    if not path:
+        return
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    with open(path, 'a') as f:
+        for link in links:
+            f.write(link + '\n')
+
+
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--seen-file', default='', help='Path to file tracking seen tweet links (for deduplication)')
+    args = parser.parse_args()
+
     raw = sys.stdin.read()
     tweets = json.loads(raw)
-    
+
+    # Load previously seen links
+    seen_links = load_seen_links(args.seen_file)
+
     # Filter
     filtered = []
-    dropped_irrelevant = 0
+    dropped_seen = 0
     for t in tweets:
         text = t.get('text', '')
-        if len(text) < MIN_TEXT_LEN:
-            continue
-        if is_spam(text):
-            continue
-        if not is_ai_relevant(text):
-            dropped_irrelevant += 1
+        link = t.get('link', '')
+        # If LLM verdict is present, use it (only keep "quality")
+        if 'verdict' in t:
+            if t['verdict'] != 'quality':
+                continue
+        else:
+            # Fallback: basic rule-based filter
+            if len(text) < MIN_TEXT_LEN:
+                continue
+            if is_spam(text):
+                continue
+        # Dedup: skip already-seen tweets
+        if link and link in seen_links:
+            dropped_seen += 1
             continue
         filtered.append(t)
-    
+
     # Score and rank
     for t in filtered:
         t['_score'] = score_tweet(t)
-    
+
     filtered.sort(key=lambda x: x['_score'], reverse=True)
-    
+
     # Take top 30
     top = filtered[:30]
-    
+
+    # Persist seen links for next run
+    new_links = [t['link'] for t in top if t.get('link')]
+    save_seen_links(args.seen_file, new_links)
+
     # Output
     digest = format_digest(top)
     print(digest)
-    
+
     # Also output stats to stderr
-    print(f"\n---\nTotal scraped: {len(tweets)} | Dropped irrelevant: {dropped_irrelevant} | After filter: {len(filtered)} | Showing top: {len(top)}", file=sys.stderr)
+    print(
+        f"\n---\nTotal scraped: {len(tweets)} | Dropped seen (dedup): {dropped_seen} "
+        f"| After filter: {len(filtered)} | Showing top: {len(top)}",
+        file=sys.stderr
+    )
 
 
 if __name__ == '__main__':

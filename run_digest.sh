@@ -1,5 +1,5 @@
 #!/bin/bash
-# X/Twitter Hourly Digest — scrape, filter, mark not-interested, archive, push to repo
+# X/Twitter Hourly Digest — scrape → LLM classify → filter → follow → mark spam → archive → push
 set -euo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
 DIGEST_DIR="$DIR/digests"
@@ -17,18 +17,30 @@ if [ -z "$RAW" ] || [ "$RAW" = "[]" ]; then
     exit 1
 fi
 
-# Step 2: Mark off-topic tweets as "Not interested" (max 3, with delays)
-echo "$RAW" | (cd "$DIR" && uv run --with playwright python mark_not_interested.py) 2>&1 || true
+# Step 2: LLM classify (haiku via OpenRouter)
+CLASSIFIED=$(echo "$RAW" | (cd "$DIR" && uv run python llm_classify.py) 2>/dev/null)
 
-# Step 3: Filter and format digest
-DIGEST=$(echo "$RAW" | (cd "$DIR" && uv run python filter_digest.py) 2>/dev/null)
+if [ -z "$CLASSIFIED" ]; then
+    echo "LLM classification failed, falling back to raw" >&2
+    CLASSIFIED="$RAW"
+fi
+
+# Step 3: Auto-follow quality tweet authors
+echo "$CLASSIFIED" | (cd "$DIR" && uv run --with playwright python auto_follow.py) 2>&1 || true
+
+# Step 4: Mark spam tweets as "Not interested"
+echo "$CLASSIFIED" | (cd "$DIR" && uv run --with playwright python mark_not_interested.py) 2>&1 || true
+
+# Step 5: Filter and format digest (only quality tweets, dedup across runs)
+SEEN_FILE="$DIR/seen_links.txt"
+DIGEST=$(echo "$CLASSIFIED" | (cd "$DIR" && uv run python filter_digest.py --seen-file "$SEEN_FILE") 2>/dev/null)
 
 if [ -z "$DIGEST" ]; then
     echo "Empty digest after filtering at $TIMESTAMP" >&2
     exit 1
 fi
 
-# Step 4: Save to file
+# Step 6: Save to file
 OUTFILE="$DIGEST_DIR/${DATE}_${HOUR}.md"
 {
     echo "# X Digest — $DATE ${HOUR}:00 UTC"
@@ -36,11 +48,11 @@ OUTFILE="$DIGEST_DIR/${DATE}_${HOUR}.md"
     echo "$DIGEST"
 } > "$OUTFILE"
 
-# Step 5: Push to repo
+# Step 7: Push to repo
 cd "$DIR"
 git add "digests/${DATE}_${HOUR}.md"
 git commit -m "digest: ${DATE} ${HOUR}:00 UTC" --quiet 2>/dev/null || true
 git push origin main --quiet 2>/dev/null || git push origin master --quiet 2>/dev/null || true
 
-# Step 6: Output digest for delivery
+# Step 8: Output digest for delivery
 echo "$DIGEST"
