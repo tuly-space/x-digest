@@ -131,8 +131,8 @@ EXTRACT_JS = """
             seen.add(href);
 
             const rawUser = userEl ? userEl.textContent.trim() : '';
-            const parts   = rawUser.split('@');
-            const handle  = parts.length > 1 ? parts[parts.length - 1].trim() : rawUser;
+            const pathParts = href.split('/').filter(Boolean);
+            const handle  = pathParts.length >= 1 ? pathParts[0] : (rawUser.split('@').pop() || '').trim();
             const text    = textEl ? textEl.innerText.trim() : '';
             const ts      = timeEl ? timeEl.getAttribute('datetime') : '';
             const likes   = likeEl ? (parseInt(likeEl.getAttribute('aria-label') || '0') || 0) : 0;

@@ -69,9 +69,13 @@ def is_ai_relevant(text: str) -> bool:
     return False
 
 
-def parse_engagement(val: str) -> int:
-    """Parse engagement string like '1.2K' to int."""
-    val = val.strip()
+def parse_engagement(val) -> int:
+    """Parse engagement value like '1.2K' or 1200 to int."""
+    if val is None:
+        return 0
+    if isinstance(val, (int, float)):
+        return int(val)
+    val = str(val).strip()
     if not val:
         return 0
     val = val.replace(',', '')

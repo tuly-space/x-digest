@@ -19,6 +19,7 @@ MAX_FOLLOWS_PER_RUN = 5
 
 async def follow_user(page, handle: str) -> bool:
     """Navigate to @handle profile and click Follow if not already following. Returns True if followed."""
+    handle = handle.split("·", 1)[0].split()[0].strip().lstrip("@")
     try:
         await page.goto(f"https://x.com/{handle}", wait_until="domcontentloaded", timeout=20000)
         await page.wait_for_timeout(3000)
