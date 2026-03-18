@@ -19,8 +19,8 @@ if [ -z "$CLASSIFIED" ] || [ "$CLASSIFIED" = "[]" ]; then
     exit 1
 fi
 
-# Step 3: Auto-follow quality tweet authors
-echo "$CLASSIFIED" | (cd "$DIR" && uv run --with playwright python auto_follow.py) 2>&1 || true
+# Step 3: Auto-follow quality tweet authors; capture newly followed handles
+NEW_FOLLOWS=$(echo "$CLASSIFIED" | (cd "$DIR" && uv run --with playwright python auto_follow.py) 2>/dev/null || true)
 
 # Step 5: Filter and format digest (only quality tweets, dedup across runs)
 SEEN_FILE="$DIR/seen_links.txt"
@@ -45,5 +45,10 @@ git add "digests/${DATE}_${HOUR}.md"
 git commit -m "digest: ${DATE} ${HOUR}:00 UTC" --quiet 2>/dev/null || true
 git push origin main --quiet 2>/dev/null || git push origin master --quiet 2>/dev/null || true
 
-# Step 8: Output digest for delivery
+# Step 8: Output digest (+ new follows) for delivery
 echo "$DIGEST"
+if [ -n "$NEW_FOLLOWS" ]; then
+    echo ""
+    echo "---"
+    echo "**新关注：** $NEW_FOLLOWS"
+fi

@@ -76,15 +76,19 @@ async def main():
         context = browser.contexts[0]
         page = await context.new_page()
 
-        followed = 0
+        followed_handles = []
         for handle in to_follow:
             if await follow_user(page, handle):
-                followed += 1
+                followed_handles.append(handle)
             delay = random.uniform(3, 8)
             await page.wait_for_timeout(int(delay * 1000))
 
         await page.close()
-        print(f"\nFollowed {followed} new users.", file=sys.stderr)
+        print(f"\nFollowed {len(followed_handles)} new users.", file=sys.stderr)
+
+        # Output followed handles to stdout for the shell to capture
+        if followed_handles:
+            print("\n".join(f"@{h}" for h in followed_handles))
 
 
 asyncio.run(main())
