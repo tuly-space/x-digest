@@ -31,25 +31,33 @@ MIN_TEXT_LEN = 30
 
 # ---------- LLM ----------
 
-CLASSIFY_PROMPT = """You are a strict curator for a high-signal Twitter digest.
+CLASSIFY_PROMPT = """You are a strict curator for a high-signal Twitter digest focused on AI agents, LLMs, and tech products/businesses.
+
 Classify each tweet as quality, spam, or skip.
 
-quality = substantive, insightful content:
-- Product thinking, design decisions, user insights
-- Engineering practices, project experiences, lessons learned
-- Business analysis, market observations, startup strategy
-- Thoughtful reflections on AI agents, LLMs, their future
-- Founder stories with real substance
+quality = substantive content in these specific areas ONLY:
+- AI agents, LLM products, and their real-world applications
+- AI/tech startup strategy, product decisions, go-to-market
+- Engineering practices around AI/LLM systems
+- Business analysis of AI companies or AI-driven products
+- Thoughtful takes on the future of AI agents and software
+- Founder stories from AI/tech space with real substance
+
+NOT quality (mark as skip or spam):
+- Macroeconomic news (interest rates, GDP, inflation, trade policy)
+- Stock market / commodities / crypto prices
+- General finance, economics, geopolitics
+- News headlines without AI/tech angle
+- Medical or health research unrelated to AI
 
 spam = discard immediately:
-- Marketing/promotion framed as ads
+- Marketing/promotion framed as insight
 - Emotional venting, hot takes with no substance
 - Hype without content ("this is the future!")
-- Self-promotion disguised as insight
-- Giveaways, follow-for-follow
+- Self-promotion, giveaways, follow-for-follow
 - Filler ("gm", "just shipped X", mindless hype)
 
-skip = everything else
+skip = anything not quality and not spam (news, off-topic, etc.)
 
 Be strict. If unsure between quality and skip → skip.
 If unsure between spam and skip → skip.

@@ -54,13 +54,34 @@ async def main():
     raw = sys.stdin.read()
     tweets = json.loads(raw)
 
-    # Get unique handles from quality tweets
+    # AI/tech topic keywords — only follow authors whose tweets touch these
+    AI_TECH_PATTERNS = [
+        r'(?i)\bai\b', r'(?i)\bllm\b', r'(?i)\bagent[s]?\b', r'(?i)\bagentic\b',
+        r'(?i)artificial intelligence', r'(?i)machine learning', r'(?i)deep learning',
+        r'(?i)large language model', r'(?i)foundation model',
+        r'(?i)gpt|claude|gemini|openai|anthropic|mistral',
+        r'(?i)\bstartup\b', r'(?i)\bfounder\b', r'(?i)\bproduct\b.*\b(ai|llm|agent)',
+        r'(?i)\b(saas|b2b)\b', r'(?i)venture|yc|y combinator',
+        r'(?i)inference|training|fine.?tun', r'(?i)prompt|rag|embedding',
+        r'(?i)copilot|cursor|codex', r'(?i)gpu|compute|nvidia',
+        r'(?i)software engineer|developer tool', r'(?i)model deployment',
+    ]
+    import re
+
+    def is_ai_tech(text: str) -> bool:
+        for p in AI_TECH_PATTERNS:
+            if re.search(p, text):
+                return True
+        return False
+
+    # Get unique handles from quality tweets that are AI/tech relevant
     quality_handles = []
     seen = set()
     for t in tweets:
         if t.get("verdict") == "quality":
             handle = t.get("handle", "")
-            if handle and handle not in seen:
+            text = t.get("text", "")
+            if handle and handle not in seen and is_ai_tech(text):
                 seen.add(handle)
                 quality_handles.append(handle)
 
