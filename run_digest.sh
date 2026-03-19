@@ -8,6 +8,9 @@ mkdir -p "$DIGEST_DIR"
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 DATE=$(date -u +"%Y-%m-%d")
 HOUR=$(date -u +"%H")
+# Beijing time (UTC+8) for display
+BJT_DATE=$(TZ=Asia/Shanghai date +"%Y-%m-%d")
+BJT_HOUR=$(TZ=Asia/Shanghai date +"%H")
 
 # Step 1-2-4 (interleaved): Scrape + LLM classify + mark "Not interested" in one pass
 # Each screen is classified and spam-marked before scrolling away.
@@ -42,7 +45,7 @@ fi
 # Step 6: Save to file
 OUTFILE="$DIGEST_DIR/${DATE}_${HOUR}.md"
 {
-    echo "# X Digest — $DATE ${HOUR}:00 UTC"
+    echo "# X Digest — $BJT_DATE ${BJT_HOUR}:00 BJT"
     echo ""
     echo "$DIGEST"
 } > "$OUTFILE"
