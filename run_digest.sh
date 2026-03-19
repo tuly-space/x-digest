@@ -47,11 +47,12 @@ OUTFILE="$DIGEST_DIR/${DATE}_${HOUR}.md"
     echo "$DIGEST"
 } > "$OUTFILE"
 
-# Step 7: Push to repo
+# Step 7: Push to repo (via jj)
 cd "$DIR"
-git add "digests/${DATE}_${HOUR}.md"
-git commit -m "digest: ${DATE} ${HOUR}:00 UTC" --quiet 2>/dev/null || true
-git push origin main --quiet 2>/dev/null || git push origin master --quiet 2>/dev/null || true
+JJ=~/.local/bin/jj
+$JJ describe -m "digest: ${DATE} ${HOUR}:00 UTC" 2>/dev/null || true
+$JJ new 2>/dev/null || true
+$JJ git push --bookmark main 2>/dev/null || true
 
 # Step 8: Output digest (+ new follows) for delivery
 echo "$DIGEST"
