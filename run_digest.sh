@@ -25,9 +25,8 @@ fi
 # Step 3: Auto-follow quality tweet authors; capture newly followed handles
 NEW_FOLLOWS=$(echo "$CLASSIFIED" | (cd "$DIR" && uv run --with playwright python auto_follow.py) 2>/dev/null || true)
 
-# Step 5: Filter to quality tweets (JSON output for summarization)
-SEEN_FILE="$DIR/seen_links.txt"
-FILTERED_JSON=$(echo "$CLASSIFIED" | (cd "$DIR" && uv run python filter_digest.py --seen-file "$SEEN_FILE" --output json) 2>/dev/null)
+# Step 5: Filter to digest-eligible tweets (JSON output for summarization)
+FILTERED_JSON=$(echo "$CLASSIFIED" | (cd "$DIR" && uv run python filter_digest.py --output json) 2>/dev/null)
 
 if [ -z "$FILTERED_JSON" ] || [ "$FILTERED_JSON" = "[]" ]; then
     echo "Empty digest after filtering at $TIMESTAMP" >&2

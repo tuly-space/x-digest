@@ -28,6 +28,7 @@ MAX_MARKS_PER_RUN = 5
 MAX_LIKES_PER_RUN = 10
 LLM_MODEL = "gpt-5.4-mini"
 MIN_TEXT_LEN = 30
+LIKES_HOT_THRESHOLD = 100
 
 # ---------- LLM ----------
 
@@ -162,7 +163,7 @@ async def main():
     seen_links = set()       # track extracted links across rounds
     total_marked = 0         # "not interested" count this run
     total_liked = 0          # liked count this run
-    counts = {"quality": 0, "spam": 0, "skip": 0}
+    counts = {"quality": 0, "quality_hot": 0, "spam": 0, "skip": 0}
 
     async with async_playwright() as p:
         browser = await p.chromium.connect_over_cdp("http://127.0.0.1:18800")
@@ -195,14 +196,26 @@ async def main():
 
                 print(f"[round {round_i+1}] scraped {len(new_tweets)} new tweets", file=sys.stderr)
 
-                # ── 2. Classify this batch ──
-                classified = classify_batch(new_tweets)
+                # ── 2. Pre-filter hot tweets, classify the rest ──
+                hot_tweets = [t for t in new_tweets if t.get("likes", 0) > LIKES_HOT_THRESHOLD]
+                llm_tweets = [t for t in new_tweets if t.get("likes", 0) <= LIKES_HOT_THRESHOLD]
+
+                for t in hot_tweets:
+                    t["verdict"] = "quality_hot"
+
+                classified_llm = classify_batch(llm_tweets) if llm_tweets else []
+                classified = hot_tweets + classified_llm
                 for t in classified:
                     counts[t.get("verdict", "skip")] += 1
                 all_tweets.extend(classified)
 
                 spam_batch = [t for t in classified if t.get("verdict") == "spam"]
-                print(f"[round {round_i+1}] quality={sum(1 for t in classified if t['verdict']=='quality')} spam={len(spam_batch)}", file=sys.stderr)
+                print(
+                    f"[round {round_i+1}] quality={sum(1 for t in classified if t['verdict'] == 'quality')} "
+                    f"quality_hot={sum(1 for t in classified if t['verdict'] == 'quality_hot')} "
+                    f"spam={len(spam_batch)}",
+                    file=sys.stderr,
+                )
 
                 # ── 3. Mark spam tweets — they're still visible in DOM ──
                 for tweet in spam_batch:
@@ -258,7 +271,7 @@ async def main():
                             pass
 
                 # ── 3b. Like quality tweets still in DOM ──
-                quality_batch = [t for t in classified if t.get("verdict") == "quality"]
+                quality_batch = [t for t in classified if t.get("verdict") in ("quality", "quality_hot")]
                 for tweet in quality_batch:
                     if total_liked >= MAX_LIKES_PER_RUN:
                         break
@@ -307,7 +320,12 @@ async def main():
         finally:
             await page.close()
 
-    print(f"\nDone — total {len(all_tweets)} tweets | quality={counts['quality']} spam={counts['spam']} skip={counts['skip']} | marked={total_marked} | liked={total_liked}", file=sys.stderr)
+    print(
+        f"\nDone — total {len(all_tweets)} tweets | quality={counts['quality']} "
+        f"quality_hot={counts['quality_hot']} spam={counts['spam']} skip={counts['skip']} "
+        f"| marked={total_marked} | liked={total_liked}",
+        file=sys.stderr,
+    )
     print(json.dumps(all_tweets, ensure_ascii=False))
 
 
